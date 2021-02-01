@@ -14,7 +14,10 @@ const GlobalStyle = createGlobalStyle`
     width: 100%;
     line-height: 1.5;
     color: white;
-  }
+    /* white-space: pre; */
+
+    white-space: pre-wrap;
+    }
 
   body {
     /* font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; */
@@ -27,7 +30,7 @@ const GlobalStyle = createGlobalStyle`
   }
 
   #app {
-    background-color: #0e2439;
+    background-color: rgb(14,36,57);
     min-height: 100vh;
     min-width: 100%;
   }
@@ -36,6 +39,10 @@ const GlobalStyle = createGlobalStyle`
   label {
     /* font-family: Georgia, Times, 'Times New Roman', serif; */
     line-height: 1.5em;
+  }
+
+  * {
+    transition: all .3s ease;
   }
 `;
 

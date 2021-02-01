@@ -13,5 +13,6 @@ export const START_SIMULATION = 'genetic_hello/Home/START_SIMULATION';
 export const STOP_SIMULATION = 'genetic_hello/Home/STOP_SIMULATION';
 
 export const UPDATE_CURRENT_STRING = 'genetic_hello/Home/UPDATE_CURRENT_STRING';
+export const UPDATE_CURRENT_STYLE = 'genetic_hello/Home/UPDATE_CURRENT_STYLE'
 
-
+export const UPDATE_SCORE = 'genetic_hello/Home/UPDATE_SCORE';

@@ -1,6 +1,52 @@
 const characterSelection = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,;:? ';
-// const characterSelection = 'ha';
 
+const GeneTypeENUM = {
+    DISCRETE: 1,
+    CONTINOUS: 2,
+};
+
+const GeneNameENUM = {
+    CONTENT_MARGINS: 'contentMargins',
+    BORDER_THICKNESS: 'borderThickness',
+    JUSTIFY_ITEMS: 'justifyItems',
+};
+
+// style: {
+//     contentMargins: 10, // px
+//     borderThickness: 1, // px
+//     justifyItems: 'start' // start, center, end, stretch
+//   }
+
+const contentMarginsGeneBlueprint = {
+    name: GeneNameENUM.CONTENT_MARGINS,
+    type: GeneTypeENUM.CONTINOUS,
+    min: 0,
+    max: 100,
+}
+
+const borderThicknessGeneBlueprint = {
+    name: GeneNameENUM.BORDER_THICKNESS,
+    type: GeneTypeENUM.CONTINOUS,
+    min: 0,
+    max: 50
+}
+
+const justifyItemsGeneBlueprint = {
+    name: GeneNameENUM.JUSTIFY_ITEMS,
+    type: GeneTypeENUM.DISCRETE,
+    values: ['start', 'center', 'end', 'stretch']
+}
+
+/**
+ * list of gene blueprints, used for random gene generation
+ */
+const geneSelection = [
+    contentMarginsGeneBlueprint, borderThicknessGeneBlueprint, justifyItemsGeneBlueprint
+];
+
+// gene type: discrete / continous
+// discrete: "start", "center", "end", "stretch"
+// continous: min 0 max 100
 
 function randomString(length) {
     var result = '';
@@ -8,6 +54,28 @@ function randomString(length) {
     var charactersLength = characters.length;
     for (var i = 0; i < length; i++) {
         result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+}
+
+function randomNumber(min, max) {
+    return Math.floor(Math.random() * (max - min + 1) + min);
+}
+
+function randomGene(geneBlueprint) {
+    var result = null;
+    if (geneBlueprint.type === GeneTypeENUM.CONTINOUS) {
+        result = {
+            type: geneBlueprint.type,
+            name: geneBlueprint.name,
+            value: randomNumber(geneBlueprint.min, geneBlueprint.max),
+        };
+    } else if (geneBlueprint.type === GeneTypeENUM.DISCRETE) {
+        result = {
+            type: geneBlueprint.type,
+            name: geneBlueprint.name,
+            value: geneBlueprint.values[randomNumber(0, geneBlueprint.values.length - 1)],
+        };
     }
     return result;
 }
@@ -32,7 +100,7 @@ function rollRandomChance(percentChance) {
 }
 
 class Individual {
-    constructor(genome = "", fitness = 0) {
+    constructor(genome = [], fitness = 0) {
         this.genome = genome;
         this.fitness = fitness;
     }
@@ -134,18 +202,11 @@ function chunkArray(arr, chunkSize) {
     return resultArray;
 }
 
-function mutate(individual, mutationChance) {
+function mutate(individual, mutationChance, geneSelection) {
     for (var i = 0; i < individual.genome.length; i++) {
-        let chance = Math.random();
-        if (chance < mutationChance) {
-            individual.genome = replaceCharAt(individual.genome, i, randomChar());
-
-            // if (rollRandomChance(50 / 100)) {
-            //     individual.genome = replaceCharAtWithIncrement(individual.genome, i, characterSelection);
-            // } else {
-            //     individual.genome = replaceCharAtWithDecrement(individual.genome, i, characterSelection);
-            // }
-
+        var chance = Math.random();
+        if (chance < mutationChance) { // if successful chance
+            individual.genome[i] = randomGene(geneSelection[i]);
         }
     }
 }
@@ -164,104 +225,119 @@ function pickAtLeastTwo(population, selectionPercent) {
 
 
 class Simulator {
-    constructor(interval = 1, resultCallback, target) {
+    constructor({ interval = 10, resultCallback }) {
         this.running = false;
+        this.stepCount = 0;
         this.worker = null;
         this.interval = interval;
         this.resultCallback = resultCallback;
-
-        this.geneCount = target.length;
-        this.populationSize = 1000;
-        this.mutationChance = 1 / 100;
+        this.currentIndividual = null;
+        this.geneCount = geneSelection.length;
+        this.geneSelection = geneSelection;
+        this.populationSize = 10;
+        this.mutationChance = 1 / 3;
         this.population = [];
-        this.target = target;
         this.foundFittest = false;
         this.selectedIndividuals = []
-        this.selectionPercent = 3 / 100;
-        this.genomeChunkMutationChance = 50 / 100;
-        this.genomeChunkSize = 5 / 100; // size of genome split into chunks for breeding purposes
+        this.selectionPercent = 25 / 100;
+        this.genomeChunkMutationChance = 75 / 100;
+        this.genomeChunkSize = 1 / geneSelection.length; // size of genome split into chunks for breeding purposes
     }
 
-    _toRun(resultCallback, _this) {
-        if (_this.foundFittest === false) {
-            // console.log("running");
-            _this.selectedIndividuals = [];
-            // select x % individuals with highest fitness score
-            for (var i = 0; i < _this.populationSize; i++) {
-                var v = _this.population[i];
-                // init individual fitness
-                v.fitness = getFitness(v, _this.target);
-            }
-            // sort population by fitness and reverse sort
-            _this.population = _this.population.sort(function (left, right) {
-                var valLeft = left.fitness;
-                var valRight = right.fitness;
-                if (valLeft < valRight) { return -1; }
-                if (valLeft > valRight) { return 1; }
-                return 0;
-            }).reverse();
+    step(val) {
+        if (this.running) {
+            // set individual in regards to current step
+            this.currentIndividual = this.population[this.stepCount];
+            // update individual with user feedback
+            this.currentIndividual.fitness = val;
 
-            _this.selectedIndividuals = pickAtLeastTwo(_this.population, _this.selectionPercent);
-            _this.population = _this.selectedIndividuals;
-            // check if we found the fittest individual
-            if (isFittest(_this.selectedIndividuals[0], _this.target)) {
-                _this.foundFittest = true;
-                console.log("found fittest individual")
-            } else {
+            this.stepCount += 1;
+
+            if (this.stepCount === this.populationSize) {
+                // if we got to the end and need to do crossover and mutation,
+                // send latest style and then start again from step 0
+
+                // reset step
+                this.stepCount = 0;
+
+                // do crossover and mutation
+
+                this.selectedIndividuals = [];
+                // select x % individuals with highest fitness score
+                // sort population by fitness and reverse sort
+                this.population = this.population.sort(function (left, right) {
+                    var valLeft = left.fitness;
+                    var valRight = right.fitness;
+                    if (valLeft < valRight) { return -1; }
+                    if (valLeft > valRight) { return 1; }
+                    return 0;
+                }).reverse();
+
+                this.selectedIndividuals = pickAtLeastTwo(this.population, this.selectionPercent);
+                this.population = this.selectedIndividuals;
+
                 // reproduce until we get pop_size again
-                var currentlySelectedLen = _this.selectedIndividuals.length;
-                var childrenCount = _this.populationSize - currentlySelectedLen // should be 270
+                var currentlySelectedLen = this.selectedIndividuals.length;
+                var childrenCount = this.populationSize - currentlySelectedLen;
                 // console.log("making children ", childrenCount);
                 for (let i = 0; i < childrenCount; i++) {
                     // randomly select two individuals to be parents
-                    var parentOne = randomSelection(_this.selectedIndividuals);
-                    var parentTwo = randomSelection(_this.selectedIndividuals);
+                    var parentOne = randomSelection(this.selectedIndividuals);
+                    var parentTwo = randomSelection(this.selectedIndividuals);
 
                     var child = new Individual();
 
                     // chunkify parent genome and mix and match with child genome
-                    var parentOneGenomeChunked = chunkArray(parentOne.genome, parentOne.genome.length * _this.genomeChunkSize);
-                    var parentTwoGenomeChunked = chunkArray(parentTwo.genome, parentTwo.genome.length * _this.genomeChunkSize);
-                    var genomeResult = "";
+                    // var parentOneGenomeChunked = chunkArray(parentOne.genome, parentOne.genome.length * this.genomeChunkSize);
+                    // var parentTwoGenomeChunked = chunkArray(parentTwo.genome, parentTwo.genome.length * this.genomeChunkSize);
+                    var parentOneGenomeChunked = parentOne.genome;
+                    var parentTwoGenomeChunked = parentTwo.genome;
+                    var genomeResult = [];
                     // iterate through genome chunks
                     for (let j = 0; j < parentOneGenomeChunked.length; j++) {
                         var parentOneChunk = parentOneGenomeChunked[j];
                         var parentTwoChunk = parentTwoGenomeChunked[j];
-                        var roll = rollRandomChance(_this.genomeChunkMutationChance);
+                        var roll = rollRandomChance(this.genomeChunkMutationChance);
                         if (roll) {
                             // child gets genome chunk from second parent
-                            genomeResult = genomeResult.concat(parentTwoChunk);
+                            genomeResult.push(parentTwoChunk);
                         } else {
                             // child gets genome chunk from first parent
-                            genomeResult = genomeResult.concat(parentOneChunk);
+                            genomeResult.push(parentOneChunk);
                         }
                     }
                     child.genome = genomeResult;
 
-                    mutate(child, _this.mutationChance)
+                    mutate(child, this.mutationChance, this.geneSelection);
 
-                    _this.population.push(child);
+                    this.population.push(child);
+                } // end for
+            } // end if
+            // do callback
 
-                }
+            this.currentIndividual = this.population[this.stepCount];
+            var currentStyle = {};
+            for (var i = 0; i < this.currentIndividual.genome.length; i++) {
+                var gene = this.currentIndividual.genome[i];
+
+                // todo: does this even work?
+                currentStyle[gene.name] = gene.value;
             }
-            // console.log("callback");
-            resultCallback(_this.selectedIndividuals[0].genome, _this.foundFittest);
-        } else {
-            // stop sim
-            _this.stopSimulation();
+
+            // tell ui about current individual's style
+            this.resultCallback(currentStyle, this.stepCount, this.foundFittest);
         }
     }
 
     _initPopulation() {
         console.log("init population");
         for (var i = 0; i < this.populationSize; i++) {
-            var v = new Individual();
-            var genome = "";
-            for (var j = 0; j < this.geneCount; j++) {
-                var gene = randomChar();
-                genome = genome.concat(gene);
+            var genome = [];
+            for (var j = 0; j < this.geneSelection.length; j++) {
+                var gene = randomGene(this.geneSelection[j])
+                genome.push(gene);
             }
-            v.genome = genome;
+            var v = new Individual(genome, 0); // 0 fitness
             this.population.push(v);
         }
     }
@@ -276,13 +352,24 @@ class Simulator {
 
         this._initPopulation();
 
-        this.worker = setInterval(this._toRun, this.interval, this.resultCallback, this);
+        // get first individuals' style
+        this.currentIndividual = this.population[0];
+        var currentStyle = {};
+        for (var i = 0; i < this.currentIndividual.genome.length; i++) {
+            var gene = this.currentIndividual.genome[i];
+
+            // todo: does this even work?
+            currentStyle[gene.name] = gene.value;
+        }
+
+        // tell ui about current individual's style
+        this.resultCallback(currentStyle, 0, this.foundFittest);
         return this.running;
     }
 
     stopSimulation() {
         if (this.running) {
-            clearInterval(this.worker);
+            // clearInterval(this.worker);
             this.running = false;
             return true;
         }

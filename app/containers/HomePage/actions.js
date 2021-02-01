@@ -15,7 +15,7 @@
  *    }
  */
 
-import { START_SIMULATION, STOP_SIMULATION, UPDATE_CURRENT_STRING } from './constants';
+import { START_SIMULATION, STOP_SIMULATION, UPDATE_CURRENT_STYLE } from './constants';
 
 /**
  * Starts the simulation
@@ -38,12 +38,13 @@ export function stopSimulation() {
 }
 
 /**
- * updates current string from highest fitness individual
+ * updates current string from individual with highest fitness
  *
  */
-export function updateCurrentString(value) {
+export function updateCurrentStyle(style, individual) {
   return {
-    type: UPDATE_CURRENT_STRING,
-    value
+    type: UPDATE_CURRENT_STYLE,
+    style,
+    individual,
   };
 }

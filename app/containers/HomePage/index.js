@@ -19,14 +19,17 @@ import {
   makeSelectError,
 } from 'containers/App/selectors';
 import messages from './messages';
-import { startSimulation, stopSimulation, updateCurrentString } from './actions';
-import { makeSelectCurrentString, makeSelectTargetString, makeSelectIsSimulationRunning } from './selectors';
+import { startSimulation, stopSimulation, updateCurrentStyle } from './actions';
+import { makeSelectCurrentStyle, makeSelectCurrentIndividual, makeSelectIsSimulationRunning } from './selectors';
 import reducer from './reducer';
 import saga from './saga';
 
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 
 import { Simulator } from 'utils/simulator';
+import StyledUI from './StyledUi';
+
+import Mousetrap from 'mousetrap';
 
 const key = 'home';
 
@@ -43,18 +46,6 @@ const Wrapper = styled.div`
   /* border: 4px solid #1a4268; */
 `;
 
-const Nav = styled.nav`
-  /* this tells parent where to place this nav */
-  grid-row: 2;
-  grid-column: 1 / 2;
-  padding: 0 10px;
-
-  /* this tells nav how to display children */
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-
-`;
 const Main = styled.main`
   grid-row: 2;
   grid-column: 2 / 3;
@@ -66,41 +57,12 @@ const Main = styled.main`
 
   border: 4px solid #1a4268;
 `;
-const Aside = styled.aside`
-  grid-row: 2;
-  grid-column: 3 / 4;
-  padding: 0 10px;
-  justify-self: right;
-`;
-
-const AsideItem = styled.div`
-  display: none;
-`;
-
-const NavItem = styled.a`
-  display: block;
-  margin: 0 auto;
-  display: none;
-`;
 
 const MainItem = styled.div`
   display: block;
   margin: 0 auto;
 
   /* border: 1px dotted red; */
-`;
-
-const CurrentString = styled.div`
-  margin: 0 auto;
-
-  padding-bottom: 10px;
-  /* border: 6px groove white; */
-`;
-const TargetString = styled.div`
-  margin: 0 auto;
-
-  padding-bottom: 10px;
-  /* border: 6px groove white; */
 `;
 
 const StartButton = styled.button`
@@ -122,8 +84,8 @@ const StartButton = styled.button`
 
 const FlexEndContainer = styled.div`
   /* tell children to stay in center of this container */
-  display: flex;
-  align-items: flex-end;
+  display: grid;
+  /* align-items: flex-end; */
   justify-content: center;
 
   margin: 0 auto;
@@ -145,11 +107,17 @@ const CenterContainer = styled.div`
   /* border: 6px solid green; */
 `;
 
+// Mousetrap.bind('=', function () { onSimStep(1) });
+// Mousetrap.bind('-', function () { onSimStep(0) });
+
+Mousetrap.bind('=', function () { console.log('+') });
+Mousetrap.bind('-', function () { console.log('-') });
+
 var simulator = null;
 
 const onStartButtonPress = function (callback, target, onStartSimulation, onStopSimulation) {
   if (simulator === null) {
-    simulator = new Simulator(50, callback, target);
+    simulator = new Simulator({ interval: 1, resultCallback: callback, target: target });
   }
   if (simulator.isRunning()) {
     simulator.stopSimulation();
@@ -160,9 +128,23 @@ const onStartButtonPress = function (callback, target, onStartSimulation, onStop
   }
 }
 
-function buildSimResultCallback(onUpdateCurrentString, onStopSimulation) {
-  return function (currentStr, finished) {
-    onUpdateCurrentString(currentStr);
+const onSimStep = function (val) {
+  if (simulator !== null) {
+    simulator.step(val);
+  }
+}
+
+/**
+ * builds a function that sim calls when a result is found.
+ * calls function to update reducer of the current style
+ * sends current style and a "finished" flag if an individual with top fitness is found
+ * currently "finished" flag is not used
+ * @param {*} onUpdateCurrentStyle 
+ * @param {*} onStopSimulation 
+ */
+function buildSimResultCallback(onUpdateCurrentStyle, onStopSimulation) {
+  return function (currentStyle, currentIndividual, finished) {
+    onUpdateCurrentStyle(currentStyle, currentIndividual);
     if (finished) {
       onStopSimulation();
     }
@@ -175,9 +157,9 @@ export function HomePage({
   onSubmitForm,
   onStartSimulation,
   onStopSimulation,
-  onUpdateCurrentString,
-  currentString,
-  targetString,
+  onUpdateCurrentStyle,
+  currentStyle,
+  currentIndividual,
   isSimulationRunning,
 }) {
   useInjectReducer({ key, reducer });
@@ -196,42 +178,27 @@ export function HomePage({
         />
       </Helmet>
 
-      <Nav>
-        <NavItem>
-          nav one
-        </NavItem>
-        <NavItem>
-          nav two
-        </NavItem>
-        <NavItem>
-          nav three
-        </NavItem>
-      </Nav>
-
       <Main>
         <MainItem>
           <FlexEndContainer>
             <StartButton onClick={() => {
-              onStartButtonPress(buildSimResultCallback(onUpdateCurrentString, onStopSimulation), targetString, onStartSimulation, onStopSimulation);
+              onStartButtonPress(buildSimResultCallback(onUpdateCurrentStyle, onStopSimulation), null, onStartSimulation, onStopSimulation);
             }}>{isSimulationRunning ? 'STOP' : 'START'}</StartButton>
+            <StartButton onClick={() => {
+              onSimStep(1);
+            }}>{isSimulationRunning ? 'LIKE' : 'NO PRESS'}</StartButton>
+            <StartButton onClick={() => {
+              onSimStep(0);
+            }}>{isSimulationRunning ? 'DISLIKE' : 'NO PRESS'}</StartButton>
+            <span>{currentIndividual}</span>
           </FlexEndContainer>
         </MainItem>
         <MainItem>
           <CenterContainer>
-            <CurrentString>{currentString}</CurrentString>
-            <TargetString>{targetString}</TargetString>
+            <StyledUI style={currentStyle}></StyledUI>
           </CenterContainer>
         </MainItem>
-        <MainItem></MainItem>
       </Main>
-      <Aside>
-        <AsideItem>
-          aside one
-        </AsideItem>
-        <AsideItem>
-          aside two
-        </AsideItem>
-      </Aside>
     </Wrapper>
   );
 }
@@ -241,17 +208,17 @@ HomePage.propTypes = {
   error: PropTypes.oneOfType([PropTypes.object, PropTypes.bool]),
   onStartSimulation: PropTypes.func,
   onStopSimulation: PropTypes.func,
-  onUpdateCurrentString: PropTypes.func,
-  currentString: PropTypes.string,
-  targetString: PropTypes.string,
+  onUpdateCurrentStyle: PropTypes.func,
+  currentStyle: PropTypes.object,
+  currentIndividual: PropTypes.number,
   isSimulationRunning: PropTypes.bool,
 };
 
 const mapStateToProps = createStructuredSelector({
   loading: makeSelectLoading(),
   error: makeSelectError(),
-  currentString: makeSelectCurrentString(),
-  targetString: makeSelectTargetString(),
+  currentStyle: makeSelectCurrentStyle(),
+  currentIndividual: makeSelectCurrentIndividual(),
   isSimulationRunning: makeSelectIsSimulationRunning(),
 });
 
@@ -259,7 +226,7 @@ export function mapDispatchToProps(dispatch) {
   return {
     onStartSimulation: evt => dispatch(startSimulation()),
     onStopSimulation: evt => dispatch(stopSimulation()),
-    onUpdateCurrentString: val => dispatch(updateCurrentString(val)),
+    onUpdateCurrentStyle: (style, individual) => dispatch(updateCurrentStyle(style, individual)),
   };
 }
 

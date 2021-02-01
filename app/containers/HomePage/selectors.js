@@ -23,4 +23,14 @@ const makeSelectIsSimulationRunning = () =>
     selectHome,
     homeState => homeState.isSimulationRunning,
   );
-export { selectHome, makeSelectCurrentString, makeSelectTargetString, makeSelectIsSimulationRunning };
+const makeSelectCurrentStyle = () =>
+  createSelector(
+    selectHome,
+    homeState => homeState.style,
+  );
+const makeSelectCurrentIndividual = () =>
+  createSelector(
+    selectHome,
+    homeState => homeState.individual,
+  );
+export { selectHome, makeSelectCurrentString, makeSelectTargetString, makeSelectIsSimulationRunning, makeSelectCurrentStyle, makeSelectCurrentIndividual };

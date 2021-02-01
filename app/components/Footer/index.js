@@ -10,7 +10,7 @@ function Footer() {
   return (
     <Wrapper>
       <section>
-        f o o t e r
+        footer section
       </section>
     </Wrapper>
   );
